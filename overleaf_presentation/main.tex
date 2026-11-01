@@ -1,0 +1,243 @@
+\documentclass[aspectratio=169,10pt]{beamer}
+
+\usetheme{Madrid}
+\usecolortheme{default}
+
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{xcolor}
+
+\definecolor{nitkblue}{RGB}{18,52,102}
+\definecolor{muted}{RGB}{90,100,115}
+\definecolor{warn}{RGB}{180,60,40}
+
+\setbeamercolor{palette primary}{bg=nitkblue,fg=white}
+\setbeamercolor{structure}{fg=nitkblue}
+\setbeamercolor{block title}{bg=nitkblue,fg=white}
+\setbeamercolor{block body}{bg=nitkblue!6,fg=black}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{blocks}[rounded][shadow=false]
+\setbeamertemplate{itemize item}[circle]
+
+\title[MATP Endsem]{MATP: Temporal and State Aware Semantic Memory for Agentic LLMs}
+\subtitle{Contribution 1: Versioning with a Persistent Memory Buffer via MCP}
+\author[Rahul Saravanan]{Rahul Saravanan}
+\institute[NITK]{Department of Information Technology \\ National Institute of Technology Karnataka, Surathkal}
+\date{End-Semester Evaluation, November 2026}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{The long horizon problem}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.49\textwidth}
+      \begin{block}{What breaks today}
+        \begin{itemize}
+          \item Agent keeps 10 to 30 tool outputs in context. FIFO eviction drops early, critical state and causes catastrophic forgetting.
+          \item Naive RAG keeps everything but has no notion of mutation. A query still matches schema v1 on keyword overlap and causes stale state hallucination.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \begin{block}{What we need}
+        \begin{itemize}
+          \item Keep all history, but retrieve only the current version of each resource.
+          \item Suppress states that were \emph{derived from} mutated resources, not just the mutated file itself.
+          \item No token bloat, no external service, no network.
+        \end{itemize}
+      \end{block}
+      \vspace{0.6em}
+      {\small \textbf{Question:} how to retain history without returning superseded or dependent-stale state?}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Objectives}
+  \begin{block}{Goal}
+    Replace rigid context pruning with a persistent, queryable semantic memory buffer exposed as an MCP server.
+  \end{block}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Dual memory}
+        \begin{itemize}
+          \item Working memory: small active context for reasoning.
+          \item Long term buffer: keeps every version, tagged by resource id and logical clock.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Operations}
+        \begin{itemize}
+          \item Ingest: tag, embed, version, mark superseded, record dependency edges.
+          \item Retrieve: score with $R(q,v_i)$, filter stale, decay by age.
+          \item Audit: full history and dependency graph per resource.
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Scoring: $R(q,v_i)$}
+  \begin{block}{State aware retrieval}
+    Let $q$ be the query embedding, $v_i$ a stored state, $t_{\mathrm{curr}}$ the logical clock, $t_i$ the birth step of $v_i$:
+    \[
+      R(q,v_i)=
+      \begin{cases}
+        0 & \text{if }\exists j:\ \text{id}_j=\text{id}_i \land t_j>t_i\\[2pt]
+        0 & \text{if } v_i \text{ depends on a state mutated after } t_i\\[2pt]
+        \cos(q,v_i)\,\cdot e^{-\lambda\,(t_{\mathrm{curr}}-t_i)} & \text{otherwise}
+      \end{cases}
+    \]
+  \end{block}
+  \vspace{0.2em}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.33\textwidth}
+      \textbf{1. Logical clock $t$}\\[1pt]
+      {\footnotesize Discrete causal steps, not wall time. Each ingest increments the clock.}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \textbf{2. Superseding $R=0$}\\[1pt]
+      {\footnotesize Newer version of the same resource zeroes the old one when filtering is enabled.}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \textbf{3. Decay $e^{-\lambda\Delta t}$}\\[1pt]
+      {\footnotesize Among active states, recent steps outrank old ones. Default $\lambda=0.05$.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Dependency graph invalidation (endsem)}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.49\textwidth}
+      \begin{block}{Cross-resource stale state}
+        \begin{itemize}
+          \item Midsem leak: ORM \texttt{user.py} v1 kept scoring after schema v2 because its resource id differs.
+          \item Fix: ingest declares \texttt{dependencies=[resource\_id, ...]}.
+          \item If any dependency has a newer version than $v_i$, $v_i$ is also $R=0$.
+          \item Propagation is transitive: \texttt{tests} $\to$ \texttt{session} $\to$ \texttt{auth}.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \begin{block}{Lifecycle}
+        \begin{itemize}
+          \item Re-ingesting the dependent after the dependency refresh clears the invalidation (its step $>$ dependency step).
+          \item Edges persist in the JSONL metadata; \texttt{dependency\_graph()} MCP tool exposes nodes, edges, dependents, invalid set.
+          \item On the 40-step benchmark the graph suppresses \texttt{tests/test\_auth.py} (written against session v2) when session v3 lands.
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Adaptive temporal decay (endsem)}
+  \begin{block}{Learn $\lambda$ per task instead of one global constant}
+    Feedback reports which retrieved items were useful at age $\Delta t_i$:
+    \[
+      \lambda_{\text{task}} \leftarrow (1-\alpha)\,\lambda_{\text{task}} + \alpha\,\frac{\ln 2}{\mathrm{median}(\Delta t_i)}
+    \]
+    The half-life is set so the median useful state decays by 50\%.
+  \end{block}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.33\textwidth}
+      \textbf{Interface}\\[1pt]
+      {\footnotesize \texttt{time\_decay="auto"}, \texttt{task="..."} on retrieve; \texttt{record\_feedback(task, ids)} after use.}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \textbf{Behaviour}\\[1pt]
+      {\footnotesize Always-fresh tasks grow $\lambda$ (strong recency); horizon tasks shrink it. Clipped to $[0.005, 0.5]$.}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \textbf{Persistence}\\[1pt]
+      {\footnotesize Stored in \texttt{<db>.decay.json}; \texttt{get\_decay\_stats()} reports learned values.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Benchmark: long horizon ($t=1$ to $40$)}
+  {\footnotesize Setup: 10 resources, 3 schema versions, 2 auth versions, ORM/session/routes/tests declared as dependents; 5 queries with legacy-heavy terms so lexical overlap favours stale text. FIFO baseline keeps a 10-step window.}
+
+  \vspace{0.3em}
+  \begin{table}
+    \centering
+    \footnotesize
+    \begin{tabular}{lccccc}
+      \toprule
+      Method & Lineage stale (top-5) & Graph-drop & Precision & Retention\\
+      \midrule
+      FIFO (window 10) & -- & -- & 0\% (2/4 forgotten) & 50\%\\
+      Naive RAG (cosine, $k=5$) & 20/25 = 80\% & -- & 5/25 = 20\% & 100\%\\
+      MATP (lineage, $k=5$, $\lambda=0.05$) & 0/25 = 0\% & -- & 25/25 = 100\% & 100\%\\
+      \textbf{MATP+graph (this work)} & \textbf{0/25 = 0\%} & \textbf{1} & \textbf{25/25 = 100\%} & \textbf{100\%}\\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.48\textwidth}
+      {\footnotesize \textbf{What the numbers mean}}
+      \begin{itemize}
+        \footnotesize
+        \item Naive surfaces 4 of 5 stale versions per query: the midsem leak generalises.
+        \item Lineage filtering alone already reaches 100\% here; the graph additionally kills the dependent \texttt{tests/test\_auth.py}.
+        \item FIFO would forget \texttt{db/schema.sql} and \texttt{config/auth.env} entirely.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      {\footnotesize \textbf{Scenario demo} (midsem setup, 16 steps)}
+      \begin{itemize}
+        \footnotesize
+        \item Naive: 2/5 stale (schema v1 AND auth v1 in top-5).
+        \item MATP lineage-only: 0 stale, but ORM v1 leaks (3/4 precision).
+        \item MATP+graph: ORM suppressed, 3/3 precision; decay sweep and MCP round trip still pass.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Status and next steps}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.49\textwidth}
+      \begin{block}{Done}
+        \begin{itemize}
+          \item Grounded $R(q,v_i)$ with clock, superseding and decay.
+          \item Persistent buffer with lineage audit (atomic writes, clock persistence).
+          \item MCP server over stdio with local embeddings; 11 tools, 4 resources.
+          \item Cross-resource dependency graph with transitive invalidation.
+          \item Adaptive per-task decay from retrieval feedback.
+          \item Long-horizon benchmark: 80\% $\to$ 0\% stale in top-5.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \begin{block}{Next (beyond scope)}
+        \begin{itemize}
+          \item Learn dependency edges automatically (read diffs / call graph) instead of agent-declared.
+          \item Multi-task $\lambda$ routing by subgoal detection in the planner.
+          \item Approximate indexes (IVF) and streaming ingestion for 100k+ states.
+          \item Full agent-in-the-loop evaluation on longer SWE-style workloads.
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Takeaway}
+  \begin{itemize}
+    \item Retain without bloat: long term buffer keeps every version, working memory stays small.
+    \item Retrieve without stale: $R=0$ covers superseded versions \emph{and} states whose dependency chain moved on.
+    \item Recall at the right horizon: $\lambda$ is learned per task from feedback, not hand-tuned.
+    \item Deploy without infra: stdio MCP, local embeddings, single file persistence.
+  \end{itemize}
+  \vspace{1.2em}
+  \centering
+  {\Large Thank you}\\[2pt]
+  {\small Questions and discussion}
+\end{frame}
+
+\end{document}

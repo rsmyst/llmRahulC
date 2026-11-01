@@ -1,0 +1,135 @@
+# MATP: Temporal and State Aware Semantic Memory Buffer
+
+MCP server that gives agentic LLMs a persistent, version aware memory. Contribution 1 of MATP (Rahul Saravanan, NITK Surathkal).
+
+Long horizon agents either forget early state (FIFO pruning) or retrieve stale state (naive RAG on mutating files like `db/schema.sql`). This buffer keeps every version and returns only the current one — including states whose *dependencies* changed.
+
+## Scoring
+
+Let $q$ be the query embedding, $v_i$ a stored state, $t_{curr}$ the logical clock, $t_i$ the birth step:
+
+$$R(q, v_i) = \begin{cases} 0 & \text{if } v_i \text{ is superseded} \\ 0 & \text{if } v_i \text{ depends (transitively) on a state mutated after } t_i \\ \cos(q, v_i) \cdot e^{-\lambda(t_{curr} - t_i)} & \text{otherwise} \end{cases}$$
+
+* Logical clock `t` is discrete causal steps, not wall time.
+* Superseding is hard: older version of same `resource_id` is dropped when `exclude_stale=true`.
+* Dependency invalidation (endsem): declare `dependencies=[...]` at ingest. If any dependency resource has a newer version than $v_i$ — or its own dependency chain is invalid — $v_i$ is suppressed too (`propagate_dependencies=true`, the default). Re-ingesting the dependent after the dependency refresh clears the invalidation.
+* Decay `exp(-lambda * age)` prefers recent active state. Default `lambda=0.05`; `time_decay="auto"` uses a per-task lambda learned from retrieval feedback (see Adaptive decay).
+
+## Project structure
+
+```
+src/semantic_memory/
+  vectorstore.py   FAISS IndexFlatIP + JSONL lineage + dependency graph, implements R(q,v_i)
+  decay.py         adaptive decay tuner: learns lambda per task/subgoal
+  embeddings.py    gemini-embedding-001 if SM_GEMINI_API_KEY is set, else nomic-embed-text-v1.5 locally
+  service.py       ingest, retrieve, feedback, history, graph, clock
+  server.py        FastMCP stdio server (11 tools, 4 resources)
+  config.py        env config
+demo.py            interactive scenario benchmark + MCP round trip
+benchmark.py       long-horizon endsem benchmark (40 steps, 5 queries)
+live_demo.py       wrapper: live_demo.py [benchmark]
+presentation.tex   slides
+architecture.drawio  system diagram
+```
+
+Only Contribution 1 is included. No synthesizer or queue code.
+
+## Setup
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+
+# optional: use Gemini instead of local Nomic
+cp .env.example .env
+# edit SM_GEMINI_API_KEY in .env
+```
+
+Environment variables (see `.env.example`):
+
+* `SM_GEMINI_API_KEY` empty means local `nomic-embed-text-v1.5` (768d, normalized, no network after first download).
+* `SM_BUFFER_DB` path prefix for `*.index`, `*.jsonl`, `*.clock`, `*.decay.json`. Default `./memory_buffer.db`.
+* `SM_DEFAULT_DECAY_LAMBDA` default `0.05`.
+* `SM_EMBED_MODEL`, `SM_EMBED_DIM` only used with Gemini.
+
+First run downloads `nomic-ai/nomic-embed-text-v1.5` from Hugging Face (about 500MB, cached after). Needs about 2GB RAM.
+
+## Running the demos
+
+### Scenario demo (midsem scenario, endsem features)
+
+```bash
+python demo.py
+```
+
+Compares naive cosine vs MATP lineage-only vs MATP+graph on the schema v1→v2 refactor, then runs the decay sweep, an adaptive-decay feedback round trip, the lineage audit, the dependency graph, and an MCP stdio round trip.
+
+### Long-horizon benchmark (endsem)
+
+```bash
+python benchmark.py
+# or: python live_demo.py benchmark
+```
+
+40 logical steps, 10 resources, 3 schema versions, overlapping mutations, 5 queries. Aggregate result:
+
+| Method | Lineage stale in top-5 | Graph-dropped | Effective precision | Retention |
+|---|---|---|---|---|
+| FIFO (window 10) | — | — | 0% (2/4 current resources forgotten) | 50% |
+| Naive RAG (cosine, k=5) | 20/25 = 80% | — | 5/25 = 20% | 100% |
+| MATP (lineage, k=5, λ=0.05) | 0/25 = 0% | — | 25/25 = 100% | 100% |
+| MATP+graph (k=5, λ=0.05) | 0/25 = 0% | 1 dependent suppressed | 25/25 = 100% | 100% |
+
+The graph suppression case is `tests/test_auth.py`: written against `src/auth/session.py` v2, invalidated when session v3 arrives, and cleared again once the test is re-ingested.
+
+### MCP server standalone
+
+```bash
+python -m semantic_memory
+```
+
+Configure an MCP client with:
+
+```json
+{
+  "command": "python",
+  "args": ["-m", "semantic_memory"],
+  "cwd": "/path/to/semantic-memory-buffer",
+  "env": { "SM_BUFFER_DB": "./memory_buffer.db" }
+}
+```
+
+Tools: `ingest_state`, `ingest_tool_output`, `retrieve_context`, `record_feedback`, `get_decay_stats`, `dependency_graph`, `get_resource_history`, `list_resources`, `advance_clock`, `get_memory_stats`, `clear_memory`.
+Resources: `memory://stats`, `memory://resources`, `memory://graph`, `memory://decay`.
+
+Example:
+
+```
+ingest_state(resource_id="db/schema.sql", content="CREATE TABLE ...", step_id=1)
+ingest_state(resource_id="src/models/user.py", content="class User...",
+             step_id=4, dependencies=["db/schema.sql"])
+ingest_state(resource_id="db/schema.sql", content="CREATE TABLE ... oauth ...", step_id=5)
+retrieve_context(query="oauth schema", k=4, exclude_stale=true, time_decay=0.05)
+dependency_graph()          # shows src/models/user.py invalidated by schema v2
+record_feedback(task="refactor", useful_item_ids=[3, 5])
+retrieve_context(query="oauth schema", time_decay="auto", task="refactor")
+get_resource_history(resource_id="db/schema.sql")
+```
+
+## Adaptive decay (endsem)
+
+`time_decay="auto"` + `task=<name>` uses a lambda learned from `record_feedback`:
+
+```
+lambda_task ← (1-α)·lambda_task + α·ln(2)/median_age(useful items)
+```
+
+i.e. the half-life that makes the median age of states the agent reported useful decay by 50%. Fresh-state tasks get a large λ (strong recency), horizon tasks a small one. Persisted in `<db>.decay.json`; inspect with `get_decay_stats()`.
+
+## Slides
+
+```bash
+# presentation.tex is the source, overleaf_presentation/main.tex is a copy
+tectonic -X compile presentation.tex --outdir build
+```

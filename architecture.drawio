@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" version="22.0.0">
+  <diagram id="matp-simple" name="Architecture">
+    <mxGraphModel dx="1200" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="960" pageHeight="640" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="bg" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=none;" parent="1" vertex="1">
+          <mxGeometry x="0" y="0" width="960" height="640" as="geometry"/>
+        </mxCell>
+
+        <!-- Title -->
+        <mxCell id="title" value="&lt;b&gt;Semantic Memory Buffer&lt;/b&gt; &lt;font color=&quot;#6B7280&quot;&gt;— Temporal &amp;amp; State-Aware (MATP Contribution 1)&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;fontColor=#111827;" parent="1" vertex="1">
+          <mxGeometry x="30" y="14" width="900" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="subtitle" value="Every version retained · only the current one retrieved" style="text;html=1;align=center;verticalAlign=middle;fontSize=10;fontColor=#6B7280;" parent="1" vertex="1">
+          <mxGeometry x="30" y="38" width="900" height="14" as="geometry"/>
+        </mxCell>
+
+        <!-- Client -->
+        <mxCell id="client" value="&lt;b&gt;Agentic LLM&lt;/b&gt;&lt;div&gt;&lt;font color=&quot;#6B7280&quot; style=&quot;font-size:10px&quot;&gt;any MCP host · Claude / Codex&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#93B4E6;arcSize=12;fontSize=13;fontColor=#1E3A5F;" parent="1" vertex="1">
+          <mxGeometry x="310" y="68" width="340" height="52" as="geometry"/>
+        </mxCell>
+
+        <!-- stdio label -->
+        <mxCell id="stdio" value="stdio · JSON-RPC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93B4E6;fontSize=8;fontColor=#4B68A3;" parent="1" vertex="1">
+          <mxGeometry x="410" y="128" width="140" height="16" as="geometry"/>
+        </mxCell>
+
+        <!-- MCP Server -->
+        <mxCell id="server" value="&lt;b&gt;MCP Server&lt;/b&gt; &lt;font color=&quot;#6B7280&quot; style=&quot;font-size:9px&quot;&gt;server.py · FastMCP&lt;/font&gt;&lt;div&gt;&lt;font color=&quot;#374151&quot; style=&quot;font-size:10px&quot;&gt;11 tools &amp;nbsp;·&amp;nbsp; 4 resources&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#6B7280&quot; style=&quot;font-size:8px&quot;&gt;ingest · retrieve · feedback · graph · history · stats&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ECFDF5;strokeColor=#6EBF8B;arcSize=12;fontSize=12;fontColor=#14532D;" parent="1" vertex="1">
+          <mxGeometry x="310" y="152" width="340" height="72" as="geometry"/>
+        </mxCell>
+
+        <!-- Memory Service -->
+        <mxCell id="service" value="&lt;b&gt;Memory Service&lt;/b&gt; &lt;font color=&quot;#6B7280&quot; style=&quot;font-size:9px&quot;&gt;service.py&lt;/font&gt;&lt;div&gt;&lt;font color=&quot;#6B7280&quot; style=&quot;font-size:9px&quot;&gt;orchestrates embeddings + buffer + clock&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#E6C76B;arcSize=12;fontSize=12;fontColor=#78350F;" parent="1" vertex="1">
+          <mxGeometry x="310" y="244" width="340" height="56" as="geometry"/>
+        </mxCell>
+
+        <!-- Embeddings -->
+        <mxCell id="embed" value="&lt;b&gt;Embeddings&lt;/b&gt; &lt;font color=&quot;#6B7280&quot; style=&quot;font-size:9px&quot;&gt;embeddings.py&lt;/font&gt;&lt;div&gt;&lt;font color=&quot;#374151&quot; style=&quot;font-size:10px&quot;&gt;Gemini &lt;font color=&quot;#9CA3AF&quot;&gt;or&lt;/font&gt; local Nomic&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#6B7280&quot; style=&quot;font-size:8px&quot;&gt;768-d · normalized&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F0FF;strokeColor=#B8A0D0;arcSize=12;fontSize=12;fontColor=#3D2852;" parent="1" vertex="1">
+          <mxGeometry x="60" y="340" width="280" height="86" as="geometry"/>
+        </mxCell>
+
+        <!-- Buffer -->
+        <mxCell id="buffer" value="&lt;b&gt;Semantic Buffer&lt;/b&gt; &lt;font color=&quot;#6B7280&quot; style=&quot;font-size:9px&quot;&gt;vectorstore.py&lt;/font&gt;&lt;div&gt;&lt;font color=&quot;#374151&quot; style=&quot;font-size:10px&quot;&gt;FAISS + JSONL lineage + dependency graph + clock&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#6B7280&quot; style=&quot;font-size:8px&quot;&gt;R = 0 if superseded or dep-invalid else cos · e^(−λ·age)&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF1E6;strokeColor=#E8B48A;arcSize=12;fontSize=12;fontColor=#7A3D1A;" parent="1" vertex="1">
+          <mxGeometry x="620" y="340" width="280" height="86" as="geometry"/>
+        </mxCell>
+
+        <!-- Persistence -->
+        <mxCell id="persist" value="&lt;b&gt;Persistence&lt;/b&gt; &lt;font color=&quot;#6B7280&quot; style=&quot;font-size:8px&quot;&gt;.index + .jsonl on disk&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F9FAFB;strokeColor=#D1D5DB;arcSize=8;fontSize=10;fontColor=#374151;" parent="1" vertex="1">
+          <mxGeometry x="620" y="444" width="280" height="32" as="geometry"/>
+        </mxCell>
+
+        <!-- Config -->
+        <mxCell id="config" value="&lt;b&gt;Config&lt;/b&gt; &lt;font color=&quot;#6B7280&quot; style=&quot;font-size:8px&quot;&gt;.env · SM_BUFFER_DB · SM_GEMINI_API_KEY&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F9FAFB;strokeColor=#D1D5DB;arcSize=8;fontSize=10;fontColor=#374151;" parent="1" vertex="1">
+          <mxGeometry x="60" y="444" width="280" height="32" as="geometry"/>
+        </mxCell>
+
+        <!-- Flows -->
+        <mxCell id="flow-ingest" value="&lt;b&gt;Ingest:&lt;/b&gt; embed → version + supersede → save" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#BFDBFE;fontSize=8;fontColor=#1E40AF;" parent="1" vertex="1">
+          <mxGeometry x="360" y="344" width="240" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow-retrieve" value="&lt;b&gt;Retrieve:&lt;/b&gt; embed query → FAISS → filter stale → top-k" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EFF6FF;strokeColor=#BFDBFE;fontSize=8;fontColor=#1E40AF;" parent="1" vertex="1">
+          <mxGeometry x="360" y="368" width="240" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="e1" value="" style="endArrow=block;html=1;strokeColor=#6B7280;strokeWidth=1.6;endFill=1;rounded=0;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="480" y="120" as="sourcePoint"/>
+            <mxPoint x="480" y="152" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e2" value="" style="endArrow=block;html=1;strokeColor=#6B7280;strokeWidth=1.6;endFill=1;rounded=0;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="480" y="224" as="sourcePoint"/>
+            <mxPoint x="480" y="244" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e3" value="" style="endArrow=block;html=1;strokeColor=#B8A0D0;strokeWidth=1.4;endFill=1;rounded=0;exitX=0.25;exitY=1;entryX=0.5;entryY=0;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="400" y="300" as="sourcePoint"/>
+            <mxPoint x="200" y="340" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e4" value="" style="endArrow=block;html=1;strokeColor=#E8B48A;strokeWidth=1.4;endFill=1;rounded=0;exitX=0.75;exitY=1;entryX=0.5;entryY=0;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="560" y="300" as="sourcePoint"/>
+            <mxPoint x="760" y="340" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e5" value="" style="endArrow=block;html=1;strokeColor=#D1D5DB;strokeWidth=1.2;endFill=1;dashed=1;dashPattern=4 3;rounded=0;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="760" y="426" as="sourcePoint"/>
+            <mxPoint x="760" y="444" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <!-- embed <-> buffer dashed vector -->
+        <mxCell id="e6" value="" style="endArrow=block;html=1;strokeColor=#9CA3AF;strokeWidth=1;endFill=1;dashed=1;dashPattern=4 3;rounded=0;" parent="1" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="340" y="383" as="sourcePoint"/>
+            <mxPoint x="620" y="383" as="targetPoint"/>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e6label" value="vector" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=7;fontColor=#6B7280;labelBackgroundColor=#FFFFFF;" parent="e6" vertex="1" connectable="0">
+          <mxGeometry x="0" y="0" relative="1" as="geometry">
+            <mxPoint as="offset"/>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Footer -->
+        <mxCell id="footer" value="Run:  pip install -e .  →  python -m semantic_memory &amp;nbsp;·&amp;nbsp; Demo: python demo.py" style="text;html=1;align=center;verticalAlign=middle;fontSize=8;fontColor=#9CA3AF;" parent="1" vertex="1">
+          <mxGeometry x="30" y="600" width="900" height="14" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
